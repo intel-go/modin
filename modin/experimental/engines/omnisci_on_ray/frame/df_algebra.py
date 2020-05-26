@@ -169,7 +169,7 @@ class MaskNode(DFAlgNode):
                 InputRef(i + offs) for i in range(0, len(frame.columns))
             ]
 
-            builder.project(exprs, fields)
+        builder.project(exprs, fields)
 
     def _print(self, prefix):
         print("{}MaskNode:".format(prefix))
