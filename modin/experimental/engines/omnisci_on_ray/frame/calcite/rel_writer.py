@@ -24,7 +24,7 @@ class RelWriter:
 
         id = len(self.rel_id_map)
         self.rel_id_map[rel] = id
-        json_map["id"] = id
+        json_map["id"] = str(id)
         self.rel_list.append(json_map)
         self.previous_id = id
 

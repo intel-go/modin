@@ -60,6 +60,7 @@ class OmnisciOnRayFrameManager(RayFrameManager):
 
         # First step is to make sure all partitions are in OmniSci.
         frames = plan.collect_frames()
+
         for frame in frames:
             if frame._partitions.size != 1:
                 raise NotImplementedError(
@@ -76,8 +77,6 @@ class OmnisciOnRayFrameManager(RayFrameManager):
         writer = RelWriter()
         calcite_plan.explain(writer)
         calcite_json = writer.as_string()
-
-        print(calcite_json)
 
         print(calcite_json)
 
