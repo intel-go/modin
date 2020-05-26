@@ -1,5 +1,5 @@
-from .rel.rel_node import RelNode
-from .rex.rex_node import RexNode
+from .rel import RelNode
+from .rex import RexNode
 
 
 class RelWriter:
@@ -46,6 +46,7 @@ class RelWriter:
 
     def as_string(self):
         import json
+
         json_map = {}
         json_map["rels"] = self.rel_list
         return json.dumps(json_map)

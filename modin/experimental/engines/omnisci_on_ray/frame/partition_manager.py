@@ -22,6 +22,7 @@ from .partition import OmnisciOnRayFramePartition
 from modin.error_message import ErrorMessage
 from modin import __execution_engine__
 from .omnisci_worker import put_to_omnisci, OmnisciServer
+from .calcite.rel_writer import RelWriter
 
 import json
 
@@ -72,7 +73,13 @@ class OmnisciOnRayFrameManager(RayFrameManager):
                     p.frame_id = put_to_omnisci(df)
 
         calcite_plan = plan.to_calcite()
-        calcite_json = json.dumps({"rels": calcite_plan}, default=lambda o: o.__dict__)
+        writer = RelWriter()
+        calcite_plan.explain(writer)
+        calcite_json = writer.as_string()
+
+        print(calcite_json)
+
+        print(calcite_json)
 
         sql = "execute relalg " + calcite_json
         df = OmnisciServer()._worker._conn._execute(sql).to_df()

@@ -1,7 +1,8 @@
+from modin.experimental.engines.omnisci_on_ray.frame.calcite.rel import *
+from modin.experimental.engines.omnisci_on_ray.frame.calcite.rex import *
+from modin.experimental.engines.omnisci_on_ray.frame.calcite.builder import Builder
 from modin.experimental.engines.omnisci_on_ray.frame.calcite.rel_writer import RelWriter
 
-from modin.experimental.engines.omnisci_on_ray.frame.calcite.builder import Builder
-from modin.experimental.engines.omnisci_on_ray.frame.calcite.rex.input_ref import InputRef
 
 writer = RelWriter()
 

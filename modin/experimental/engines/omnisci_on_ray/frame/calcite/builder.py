@@ -1,11 +1,6 @@
-from .rel.table_scan import EnumerableTableScan
-from .rel.project import LogicalProject
-from .rel.filter import LogicalFilter
-
-from .rex.input_ref import InputRef
-from .rex.literal import Literal
-from .rex.local_ref import LocalRef
-
+from .rel import *
+from .rex import *
+from .datatype import DataType
 class Builder:
     stack = []
 
@@ -15,8 +10,8 @@ class Builder:
         else:
             return None
 
-    def scan(self, tables):
-        self.stack.append(EnumerableTableScan(tables))
+    def scan(self, tables, fields):
+        self.stack.append(EnumerableTableScan(tables, fields))
         return self
 
     def filter(self, condition):
@@ -28,3 +23,11 @@ class Builder:
         inp = self.stack.pop()
         self.stack.append(LogicalProject(inp, exprs, fields))
         return self
+
+    def OR(self, lhs, rhs):
+        res_type = DataType("BOOLEAN", False)
+        return OpExpr("OR", [lhs, rhs], res_type)
+
+    def EQ(self, exprs):
+        res_type = DataType("BOOLEAN", False)
+        return OpExpr("=", exprs, res_type)

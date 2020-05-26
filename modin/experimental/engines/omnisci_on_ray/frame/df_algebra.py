@@ -12,8 +12,10 @@
 # governing permissions and limitations under the License.
 
 import abc
-from .calcite_algebra import *
-
+from .calcite.rel import *
+from .calcite.rex import *
+from .calcite.builder import Builder
+from .calcite.datatype import DataType
 
 class DFAlgNode(abc.ABC):
     """Base class for all DataFrame Algebra nodes"""
@@ -23,13 +25,12 @@ class DFAlgNode(abc.ABC):
         pass
 
     def to_calcite(self):
-        CalciteBaseNode.reset_id()
-        res = []
-        self._to_calcite(res)
-        return res
+        builder = Builder()
+        self._to_calcite(builder)
+        return builder.build()
 
     @abc.abstractmethod
-    def _to_calcite(self, out_nodes):
+    def _to_calcite(self, builder):
         pass
 
     def walk_dfs(self, cb, *args, **kwargs):
@@ -54,10 +55,10 @@ class DFAlgNode(abc.ABC):
     def _append_frames(self, frames):
         pass
 
-    def _input_to_calcite(self, out_nodes):
+    def _input_to_calcite(self, builder):
         if hasattr(self, "input"):
             for i in self.input:
-                i._op._to_calcite(out_nodes)
+                i._op._to_calcite(builder)
 
     def dump(self, prefix=""):
         self._print(prefix)
@@ -82,9 +83,13 @@ class FrameNode(DFAlgNode):
     def copy(self):
         return FrameNode(self.modin_frame)
 
-    def _to_calcite(self, out_nodes):
-        node = CalciteScanNode(self.modin_frame)
-        out_nodes.append(node)
+    def _to_calcite(self, builder):
+        assert self.modin_frame._partitions.size == 1
+        assert self.modin_frame._partitions[0][0].frame_id is not None
+        builder.scan(
+            ["modin_db", self.modin_frame._partitions[0][0].frame_id],
+            self.modin_frame.columns.tolist() + ["rowid"],
+        )
 
     def _append_partitions(self, partitions):
         partitions += self.modin_frame._partitions.flatten()
@@ -120,52 +125,51 @@ class MaskNode(DFAlgNode):
             self.col_numeric_idx,
         )
 
-    def _to_calcite(self, out_nodes):
+    def _to_calcite(self, builder):
         if self.row_indices is not None:
             raise NotImplementedError("row indices masking is not yet supported")
 
         frame = self.input[0]
 
-        self._input_to_calcite(out_nodes)
+        self._input_to_calcite(builder)
 
         # select rows by rowid
         if self.row_numeric_idx is not None:
             # rowid is an additional virtual column which is always in
             # the end of the list
-            rowid_col = CalciteInputRefExpr(len(frame._table_cols))
-            condition = build_calcite_row_idx_filter_expr(
-                self.row_numeric_idx, rowid_col
-            )
-            filter_node = CalciteFilterNode(condition)
-            out_nodes.append(filter_node)
+
+            rowid_col = InputRef(len(frame._table_cols))
+            builder.filter(
+                builder.OR(
+                    [builder.EQ(rowid_col, builder.lit(idx)) for idx in self.row_numeric_idx]
+            ))
 
         # make projection
         fields = []
         exprs = []
         if frame._index_cols is not None:
             fields += frame._index_cols
-            exprs += [CalciteInputRefExpr(i) for i in range(0, len(frame._index_cols))]
+            exprs += [InputRef(i) for i in range(0, len(frame._index_cols))]
 
         if self.col_indices is not None or self.col_numeric_idx is not None:
             if self.col_indices is not None:
                 fields += to_list(self.col_indices)
                 exprs += [
-                    CalciteInputRefExpr(frame._table_cols.index(col))
+                    InputRef(frame._table_cols.index(col))
                     for col in self.col_indices
                 ]
             elif self.col_numeric_idx is not None:
                 offs = len(exprs)
                 fields += frame.columns[self.col_numeric_idx].tolist()
-                exprs += [CalciteInputRefExpr(x + offs) for x in self.col_numeric_idx]
+                exprs += [InputRef(x + offs) for x in self.col_numeric_idx]
         else:
             offs = len(exprs)
             fields += to_list(frame.columns)
             exprs += [
-                CalciteInputRefExpr(i + offs) for i in range(0, len(frame.columns))
+                InputRef(i + offs) for i in range(0, len(frame.columns))
             ]
 
-        node = CalciteProjectionNode(fields, exprs)
-        out_nodes.append(node)
+            builder.project(exprs, fields)
 
     def _print(self, prefix):
         print("{}MaskNode:".format(prefix))
@@ -181,62 +185,63 @@ class MaskNode(DFAlgNode):
 
 
 class GroupbyAggNode(DFAlgNode):
-    def __init__(self, base, by, agg, groupby_opts):
-        self.by = by
-        self.agg = agg
-        self.groupby_opts = groupby_opts
-        self.input = [base]
+    pass
+#     def __init__(self, base, by, agg, groupby_opts):
+#         self.by = by
+#         self.agg = agg
+#         self.groupby_opts = groupby_opts
+#         self.input = [base]
 
-    def copy(self):
-        return GroupbyAggNode(self.input[0], self.by, self.agg, self.groupby_opts)
+#     def copy(self):
+#         return GroupbyAggNode(self.input[0], self.by, self.agg, self.groupby_opts)
 
-    def _create_agg_expr(self, col_idx, agg):
-        # TODO: track column dtype and compute aggregate dtype,
-        # actually INTEGER works for floats too with the correct result,
-        # so not a big issue right now
-        res_type = CalciteOpExprType("INTEGER", True)
-        return CalciteAggregateExpr(agg, [col_idx], res_type, False)
+#     def _create_agg_expr(self, col_idx, agg):
+#         # TODO: track column dtype and compute aggregate dtype,
+#         # actually INTEGER works for floats too with the correct result,
+#         # so not a big issue right now
+#         res_type = DataType("INTEGER", True)
+#         #return CalciteAggregateExpr(agg, [col_idx], res_type, False)
 
-    def _to_calcite(self, out_nodes):
-        self._input_to_calcite(out_nodes)
+#     def _to_calcite(self, out_nodes):
+#         self._input_to_calcite(out_nodes)
 
-        orig_cols = self.input[0].columns.tolist()
-        table_cols = self.input[0]._table_cols
+#         orig_cols = self.input[0].columns.tolist()
+#         table_cols = self.input[0]._table_cols
 
-        # Wee need a projection to be aggregation op
-        if not isinstance(out_nodes[-1], CalciteProjectionNode):
-            proj = CalciteProjectionNode(
-                table_cols, [CalciteInputRefExpr(i) for i in range(0, len(table_cols))]
-            )
-            out_nodes.append(proj)
+#         # Wee need a projection to be aggregation op
+#         if not isinstance(out_nodes[-1], CalciteProjectionNode):
+#             proj = CalciteProjectionNode(
+#                 table_cols, [CalciteInputRefExpr(i) for i in range(0, len(table_cols))]
+#             )
+#             out_nodes.append(proj)
 
-        fields = []
-        group = []
-        aggs = []
-        for col in self.by:
-            fields.append(col)
-            group.append(table_cols.index(col))
-        for col, agg in self.agg.items():
-            if isinstance(agg, list):
-                for agg_val in agg:
-                    fields.append(col + " " + agg_val)
-                    aggs.append(self._create_agg_expr(table_cols.index(col), agg_val))
-            else:
-                fields.append(col)
-                aggs.append(self._create_agg_expr(table_cols.index(col), agg))
+#         fields = []
+#         group = []
+#         aggs = []
+#         for col in self.by:
+#             fields.append(col)
+#             group.append(table_cols.index(col))
+#         for col, agg in self.agg.items():
+#             if isinstance(agg, list):
+#                 for agg_val in agg:
+#                     fields.append(col + " " + agg_val)
+#                     aggs.append(self._create_agg_expr(table_cols.index(col), agg_val))
+#             else:
+#                 fields.append(col)
+#                 aggs.append(self._create_agg_expr(table_cols.index(col), agg))
 
-        out_nodes.append(CalciteAggregateNode(fields, group, aggs))
+#         out_nodes.append(CalciteAggregateNode(fields, group, aggs))
 
-        if self.groupby_opts["sort"]:
-            collation = [CalciteCollation(col) for col in group]
-            out_nodes.append(CalciteSortNode(collation))
+#         if self.groupby_opts["sort"]:
+#             collation = [CalciteCollation(col) for col in group]
+#             out_nodes.append(CalciteSortNode(collation))
 
-    def _print(self, prefix):
-        print("{}AggNode:".format(prefix))
-        print("{}  by: {}".format(prefix, self.by))
-        print("{}  agg: {}".format(prefix, self.agg))
-        print("{}  groupby_opts: {}".format(prefix, self.groupby_opts))
-        self._print_input(prefix + "  ")
+#     def _print(self, prefix):
+#         print("{}AggNode:".format(prefix))
+#         print("{}  by: {}".format(prefix, self.by))
+#         print("{}  agg: {}".format(prefix, self.agg))
+#         print("{}  groupby_opts: {}".format(prefix, self.groupby_opts))
+#         self._print_input(prefix + "  ")
 
 
 def to_list(indices):
