@@ -24,10 +24,13 @@ class Builder:
         self.stack.append(LogicalProject(inp, exprs, fields))
         return self
 
-    def OR(self, lhs, rhs):
+    def OR(self, exprs):
         res_type = DataType("BOOLEAN", False)
-        return OpExpr("OR", [lhs, rhs], res_type)
+        return OpExpr("OR", exprs, res_type)
 
-    def EQ(self, exprs):
+    def EQ(self, lhs, rhs):
         res_type = DataType("BOOLEAN", False)
-        return OpExpr("=", exprs, res_type)
+        return OpExpr("=", [lhs, rhs], res_type)
+
+    def lit(self, value):
+        return Literal("INTEGER", value)

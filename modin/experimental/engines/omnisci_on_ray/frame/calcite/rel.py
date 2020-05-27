@@ -22,12 +22,12 @@ class Filter(RelNode):
         return [self.inp]
 
     def explain_terms(self, writer):
-        return super().explain_terms(writer).item("condition", condition)
+        return super().explain_terms(writer).item("condition", self.condition)
 
 
 class LogicalFilter(Filter):
     def __init__(self, *args):
-        super().__init(*args)
+        super().__init__(*args)
 
     def name(self):
         return "LogicalFilter"

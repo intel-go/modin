@@ -10,7 +10,7 @@ class LocalRef(RexNode):
 
 class Literal(RexNode):
     def __init__(self, typ, value):
-        super().__init__(type=typ, value=value)
+        super().__init__(literal=value, type=typ, target_type=typ, scale=1, type_scale=1, precision=1, type_precision=1)
 
 
 class InputRef(RexNode):
