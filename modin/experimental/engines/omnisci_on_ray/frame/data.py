@@ -346,9 +346,65 @@ class OmnisciOnRayFrame(BasePandasFrame):
         raise NotImplementedError("OmnisciOnRayFrame._set_index is not yet suported")
 
     def _set_columns(self, new_columns):
-        raise NotImplementedError("OmnisciOnRayFrame._set_columns is not yet suported")
+        exprs = {}
+        for old, new in zip(self.columns, new_columns):
+            exprs[new] = InputRefExpr(self._table_cols.index(old))
 
-    # columns = property(_get_columns, _set_columns)
+        self.op = TransformNode(self, exprs)
+        self._columns_cache = new_columns
+        self._table_cols = new_columns.tolist()
+
+    def _get_columns(self):
+        return super(OmnisciOnRayFrame, self)._get_columns()
+
+    def _concat(self, axis, others, how, sort):
+        """Concatenate this dataframe with one or more others.
+
+        Args:
+            axis: The axis to concatenate over.
+            others: The list of dataframes to concatenate with.
+            how: The type of join to use for the axis.
+            sort: Whether or not to sort the result.
+
+        Returns:
+            A new dataframe.
+        """
+        if how != "outer":
+            raise NotImplementedError("_concat doesn't support joins yes")
+
+        if sort:
+            raise NotImplementedError("_concat doesn't support sort yet")
+
+        assert (
+            axis == 1
+            and all(o.index.equals(self.index) for o in others)
+            and all(o._row_lengths == self._row_lengths for o in others)
+            and len(others) == 1
+            and len(others[0].columns) == 1
+        ), "Only appending one column from the same dataframe is supported"
+
+        exprs = {}
+        for c in self.columns:
+            exprs[c] = InputRefExpr(self._table_cols.index(c))
+
+        # as we don't know column name here, we need to come up with some unique name here
+        # column name is set in dataframe.__setitem__
+        exprs["__appended_column__"] = InputRefExpr(
+            others[0]._table_cols.index(others[0].columns[0])
+        )
+
+        new_op = TransformNode(self, exprs)
+
+        new_columns = [*self.columns, "__appended_column__"]
+        new_frame = self.__constructor__(
+            columns=Index.__new__(Index, data=new_columns, dtype=self.columns.dtype),
+            op=new_op,
+            index_cols=self._index_cols,
+        )
+
+        return new_frame
+
+    columns = property(_get_columns, _set_columns)
     index = property(_get_index, _set_index)
 
     def to_pandas(self):
