@@ -116,38 +116,6 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
             new_qc = new_qc.squeeze()
         return new_qc
 
-    def concat(self, axis, other, **kwargs):
-        """Concatenates two objects together.
-
-        Args:
-            axis: The axis index object to join (0 for columns, 1 for index).
-            other: The other_index to concat with.
-
-        Returns:
-            Concatenated objects.
-        """
-        if not isinstance(other, list):
-            other = [other]
-        assert all(
-            isinstance(o, type(self)) for o in other
-        ), "Different Manager objects are being used. This is not allowed"
-
-        sort = kwargs.get("sort", None)
-        if sort is None:
-            sort = False
-        join = kwargs.get("join", "outer")
-        ignore_index = kwargs.get("ignore_index", False)
-        other_modin_frame = [o._modin_frame for o in other]
-        new_modin_frame = self._modin_frame._concat(axis, other_modin_frame, join, sort)
-        assert (
-            ignore_index == False
-        ), "Option ignore_index is not supported in omnisci backend"
-        # if ignore_index:
-        #     new_modin_frame.index = pandas.RangeIndex(
-        #         len(self.index) + sum(len(o.index) for o in other)
-        #     )
-        return self.__constructor__(new_modin_frame)
-
     def _get_index(self):
         return self._modin_frame.index
 
@@ -196,9 +164,6 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
         join = kwargs.get("join", "outer")
         ignore_index = kwargs.get("ignore_index", False)
         other_modin_frames = [o._modin_frame for o in other]
-
-        if axis == 1:
-            raise NotImplementedError("concat for axis = 1 is not supported yet")
 
         new_modin_frame = self._modin_frame._concat(
             axis, other_modin_frames, join=join, sort=sort, ignore_index=ignore_index

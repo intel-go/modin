@@ -264,64 +264,100 @@ class OmnisciOnRayFrame(BasePandasFrame):
     def _concat(
         self, axis, other_modin_frames, join="outer", sort=False, ignore_index=False
     ):
-        assert axis == 0, "unsupported concat on axis = 1"
-
-        # determine output columns
-        new_columns = OrderedDict()
-        for col in self.columns:
-            new_columns[col] = 1
-        for frame in other_modin_frames:
-            if join == "inner":
-                for col in list(new_columns):
-                    if col not in frame.columns:
-                        del new_columns[col]
-            else:
-                for col in frame.columns:
-                    if col not in new_columns:
-                        new_columns[col] = 1
-        new_columns = list(new_columns.keys())
-
-        if sort:
-            new_columns = sorted(new_columns)
-
-        # determine how many index components are going into
-        # the resulting table
-        if not ignore_index:
-            index_width = self._index_width()
+        if axis == 0:
+            # determine output columns
+            new_columns = OrderedDict()
+            for col in self.columns:
+                new_columns[col] = 1
             for frame in other_modin_frames:
-                index_width = min(index_width, frame._index_width())
+                if join == "inner":
+                    for col in list(new_columns):
+                        if col not in frame.columns:
+                            del new_columns[col]
+                else:
+                    for col in frame.columns:
+                        if col not in new_columns:
+                            new_columns[col] = 1
+            new_columns = list(new_columns.keys())
 
-        # build projections to align all frames
-        aligned_frames = []
-        for frame in [self] + other_modin_frames:
-            aligned_index = None
-            exprs = {}
+            if sort:
+                new_columns = sorted(new_columns)
+
+            # determine how many index components are going into
+            # the resulting table
             if not ignore_index:
-                if frame._index_cols:
-                    aligned_index = frame._index_cols[0 : index_width + 1]
-                    for i in range(0, index_width):
-                        col = frame._index_cols[i]
-                        exprs[col] = frame.ref(col)
-                else:
-                    assert index_width == 1, "unexpected index width"
-                    aligned_index = ["__index__"]
-                    exprs["__index__"] = frame.ref("__rowid__")
-            for col in new_columns:
-                if col in frame._table_cols:
-                    exprs[col] = frame.ref(col)
-                else:
-                    exprs[col] = LiteralExpr(None)
-            aligned_frame_op = TransformNode(frame, exprs, False)
-            aligned_frames.append(
-                self.__constructor__(
-                    columns=new_columns, op=aligned_frame_op, index_cols=aligned_index
+                index_width = self._index_width()
+                for frame in other_modin_frames:
+                    index_width = min(index_width, frame._index_width())
+
+            # build projections to align all frames
+            aligned_frames = []
+            for frame in [self] + other_modin_frames:
+                aligned_index = None
+                exprs = {}
+                if not ignore_index:
+                    if frame._index_cols:
+                        aligned_index = frame._index_cols[0 : index_width + 1]
+                        for i in range(0, index_width):
+                            col = frame._index_cols[i]
+                            exprs[col] = InputRefExpr(frame._table_cols.index(col))
+                    else:
+                        assert index_width == 1, "unexpected index width"
+                        aligned_index = ["__index__"]
+                        exprs["__index__"] = InputRefExpr(len(frame._table_cols))
+                for col in new_columns:
+                    if col in frame._table_cols:
+                        exprs[col] = InputRefExpr(frame._table_cols.index(col))
+                    else:
+                        exprs[col] = LiteralExpr(None)
+                aligned_frame_op = TransformNode(frame, exprs, False)
+                aligned_frames.append(
+                    self.__constructor__(
+                        columns=new_columns,
+                        op=aligned_frame_op,
+                        index_cols=aligned_index,
+                    )
+                )
+
+            new_op = UnionNode(aligned_frames)
+            return self.__constructor__(
+                columns=new_columns,
+                op=new_op,
+                index_cols=aligned_frames[0]._index_cols,
+            )
+        elif axis == 1:
+            assert (
+                join == "outer"
+                and not sort
+                and len(other_modin_frames) == 1
+                and len(other_modin_frames[0].columns) == 1
+                and other_modin_frames[0]._op.input[0] == self
+            ), "Only appending one column from the same dataframe is supported"
+
+            exprs = {}
+            for c in self.columns:
+                exprs[c] = InputRefExpr(self._table_cols.index(c))
+
+            # as we don't know column name here, we need to come up with some unique name here
+            # column name is set in dataframe.__setitem__
+            exprs["__appended_column__"] = InputRefExpr(
+                other_modin_frames[0]._table_cols.index(
+                    other_modin_frames[0].columns[0]
                 )
             )
 
-        new_op = UnionNode(aligned_frames)
-        return self.__constructor__(
-            columns=new_columns, op=new_op, index_cols=aligned_frames[0]._index_cols,
-        )
+            new_op = TransformNode(self, exprs)
+
+            new_columns = [*self.columns, "__appended_column__"]
+            new_frame = self.__constructor__(
+                columns=Index.__new__(
+                    Index, data=new_columns, dtype=self.columns.dtype
+                ),
+                op=new_op,
+                index_cols=self._index_cols,
+            )
+
+            return new_frame
 
     def _execute(self):
         if isinstance(self._op, FrameNode):
@@ -356,53 +392,6 @@ class OmnisciOnRayFrame(BasePandasFrame):
 
     def _get_columns(self):
         return super(OmnisciOnRayFrame, self)._get_columns()
-
-    def _concat(self, axis, others, how, sort):
-        """Concatenate this dataframe with one or more others.
-
-        Args:
-            axis: The axis to concatenate over.
-            others: The list of dataframes to concatenate with.
-            how: The type of join to use for the axis.
-            sort: Whether or not to sort the result.
-
-        Returns:
-            A new dataframe.
-        """
-        if how != "outer":
-            raise NotImplementedError("_concat doesn't support joins yes")
-
-        if sort:
-            raise NotImplementedError("_concat doesn't support sort yet")
-
-        assert (
-            axis == 1
-            and all(o.index.equals(self.index) for o in others)
-            and all(o._row_lengths == self._row_lengths for o in others)
-            and len(others) == 1
-            and len(others[0].columns) == 1
-        ), "Only appending one column from the same dataframe is supported"
-
-        exprs = {}
-        for c in self.columns:
-            exprs[c] = InputRefExpr(self._table_cols.index(c))
-
-        # as we don't know column name here, we need to come up with some unique name here
-        # column name is set in dataframe.__setitem__
-        exprs["__appended_column__"] = InputRefExpr(
-            others[0]._table_cols.index(others[0].columns[0])
-        )
-
-        new_op = TransformNode(self, exprs)
-
-        new_columns = [*self.columns, "__appended_column__"]
-        new_frame = self.__constructor__(
-            columns=Index.__new__(Index, data=new_columns, dtype=self.columns.dtype),
-            op=new_op,
-            index_cols=self._index_cols,
-        )
-
-        return new_frame
 
     columns = property(_get_columns, _set_columns)
     index = property(_get_index, _set_index)

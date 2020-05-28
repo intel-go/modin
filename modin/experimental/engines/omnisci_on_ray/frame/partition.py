@@ -48,8 +48,4 @@ class OmnisciOnRayFramePartition(BaseFramePartition):
             length=len(obj.index),
             width=len(obj.columns),
         )
-
-    def add_to_apply_calls(self, func, **kwargs):
-        return OmnisciOnRayFramePartition(
-            self.data.copy(), call_queue=self.call_queue + [(func, kwargs)]
-        )
+        
