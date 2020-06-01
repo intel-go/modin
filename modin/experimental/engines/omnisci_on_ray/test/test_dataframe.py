@@ -133,3 +133,19 @@ class TestMerge:
             return df1.merge(df2, on=on, how=how)
 
         run_and_compare(merge, data=self.data, data2=self.data2, on=on, how=how)
+
+
+def test_concat_with_same_df():
+    data = [[1, 11, 101], [1, 21, 201], [2, 12, 102], [2, 22, 202], [2, 32, 302]]
+    cols = ["a", "b", "c"]
+    pandas_df = pd.DataFrame(
+        data,
+        columns=cols
+    )
+    modin_df = pd.DataFrame(
+        data,
+        columns=cols
+    )
+    pandas_df["d"] = pandas_df["a"]
+    modin_df["d"] = modin_df["a"]
+    df_equals(pandas_df, modin_df)
