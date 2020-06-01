@@ -170,6 +170,29 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
         )
         return self.__constructor__(new_modin_frame)
 
+    def drop(self, index=None, columns=None):
+        """Remove row data for target index and columns.
+
+        Args:
+            index: Target index to drop.
+            columns: Target columns to drop.
+
+        Returns:
+            A new QueryCompiler.
+        """
+        assert index == None, "Only column drop is supported"
+        res_columns = []
+        if columns is not None:
+            for c in self.columns:
+                if not c in columns:
+                    res_columns.append(c)
+
+        return self.__constructor__(
+            self._modin_frame.mask(row_indices=index, col_indices=res_columns)
+        )
+
+
+
     def free(self):
         return
 
@@ -202,7 +225,6 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
     cumsum = DFAlgNotSupported("cumsum")
     describe = DFAlgNotSupported("describe")
     diff = DFAlgNotSupported("diff")
-    drop = DFAlgNotSupported("drop")
     dropna = DFAlgNotSupported("dropna")
     eq = DFAlgNotSupported("eq")
     eval = DFAlgNotSupported("eval")
