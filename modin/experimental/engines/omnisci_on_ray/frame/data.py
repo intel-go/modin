@@ -113,7 +113,7 @@ class OmnisciOnRayFrame(BasePandasFrame):
         col_indices=None,
         col_numeric_idx=None,
     ):
-        if col_indices:
+        if col_indices is not None:
             new_columns = col_indices
         elif col_numeric_idx is not None:
             new_columns = self.columns[col_numeric_idx]
@@ -298,20 +298,20 @@ class OmnisciOnRayFrame(BasePandasFrame):
                     aligned_index = frame._index_cols[0 : index_width + 1]
                     for i in range(0, index_width):
                         col = frame._index_cols[i]
-                        exprs[col] = InputRefExpr(frame._table_cols.index(col))
+                        exprs[col] = frame.ref(col)
                 else:
                     assert index_width == 1, "unexpected index width"
                     aligned_index = ["__index__"]
-                    exprs["__index__"] = InputRefExpr(len(frame._table_cols))
+                    exprs["__index__"] = frame.ref("__rowid__")
             for col in new_columns:
                 if col in frame._table_cols:
-                    exprs[col] = InputRefExpr(frame._table_cols.index(col))
+                    exprs[col] = frame.ref(col)
                 else:
                     exprs[col] = LiteralExpr(None)
             aligned_frame_op = TransformNode(frame, exprs, False)
             aligned_frames.append(
                 self.__constructor__(
-                    columns=new_columns, op=aligned_frame_op, index_cols=aligned_index,
+                    columns=new_columns, op=aligned_frame_op, index_cols=aligned_index
                 )
             )
 
@@ -339,20 +339,18 @@ class OmnisciOnRayFrame(BasePandasFrame):
 
             exprs = {}
             for c in self.columns:
-                exprs[c] = InputRefExpr(self._table_cols.index(c))
+                exprs[c] = self.ref(c)
 
             # as we don't know column name here, we need to come up with some unique name here
             # column name is set in dataframe.__setitem__
-            exprs["__appended_column__"] = InputRefExpr(
-                other_modin_frames[0]._table_cols.index(
-                    other_modin_frames[0].columns[0]
-                )
+            exprs["__appended_column__"] = other_modin_frames[0].ref(
+                other_modin_frames[0].columns[0]
             )
 
             new_op = TransformNode(self, exprs)
 
             new_frame = self.__constructor__(
-                self.columns.insert("__appended_column__"),
+                columns=self.columns.insert(-1, "__appended_column__"),
                 op=new_op,
                 index_cols=self._index_cols,
             )
@@ -386,7 +384,10 @@ class OmnisciOnRayFrame(BasePandasFrame):
 
         self._op = TransformNode(self, exprs)
         self._columns_cache = new_columns
-        self._table_cols = self._index_cols + new_columns.tolist()
+        if self._index_cols is not None:
+            self._table_cols = self._index_cols + new_columns.tolist()
+        else:
+            self._table_cols = new_columns.tolist()
 
     def _get_columns(self):
         return super(OmnisciOnRayFrame, self)._get_columns()
