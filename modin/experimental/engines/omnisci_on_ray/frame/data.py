@@ -337,23 +337,19 @@ class OmnisciOnRayFrame(BasePandasFrame):
                 and other_modin_frames[0]._op.input[0] == self
             ), "Only appending one column from the same dataframe is supported"
 
-            exprs = {}
-            for c in self.columns:
-                exprs[c] = self.ref(c)
+            exprs = {c: self.ref(c) for c in self.columns}
 
             # as we don't know column name here, we need to come up with some unique name here
             # column name is set in dataframe.__setitem__
-            exprs["__appended_column__"] = self.ref(
-                other_modin_frames[0].columns[0]
-            )
-
-            new_op = TransformNode(self, exprs)
+            exprs["__appended_column__"] = self.ref(other_modin_frames[0].columns[0])
 
             new_frame = self.__constructor__(
-                columns=self.columns.insert(-1, "__appended_column__"),
-                op=new_op,
+                columns=self.columns.insert(len(self.columns), "__appended_column__"),
+                op=TransformNode(self, exprs),
                 index_cols=self._index_cols,
             )
+
+            print("--------------", new_frame.columns)
 
             return new_frame
 
@@ -381,17 +377,17 @@ class OmnisciOnRayFrame(BasePandasFrame):
 
     def _set_columns(self, new_columns):
         exprs = {new: self.ref(old) for old, new in zip(self.columns, new_columns)}
-        # self.op = TransformNode(self, exprs)
-        self._columns_cache = new_columns
-        if self._index_cols is not None:
-            self._table_cols = self._index_cols + new_columns.tolist()
-        else:
-            self._table_cols = new_columns.tolist()
+        print(exprs)
+        return self.__constructor__(
+            columns=new_columns,
+            op=TransformNode(self, exprs),
+            index_cols=self._index_cols,
+        )
 
     def _get_columns(self):
         return super(OmnisciOnRayFrame, self)._get_columns()
 
-    columns = property(_get_columns, _set_columns)
+    columns = property(_get_columns)
     index = property(_get_index, _set_index)
 
     def to_pandas(self):

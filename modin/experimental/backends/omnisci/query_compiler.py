@@ -126,7 +126,7 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
         return self._modin_frame.columns
 
     def _set_columns(self, columns):
-        self._modin_frame.columns = columns
+        self._modin_frame = self._modin_frame._set_columns(columns)
 
     def fillna(
         self,
