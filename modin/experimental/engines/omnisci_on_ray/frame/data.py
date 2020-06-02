@@ -343,7 +343,7 @@ class OmnisciOnRayFrame(BasePandasFrame):
 
             # as we don't know column name here, we need to come up with some unique name here
             # column name is set in dataframe.__setitem__
-            exprs["__appended_column__"] = other_modin_frames[0].ref(
+            exprs["__appended_column__"] = self.ref(
                 other_modin_frames[0].columns[0]
             )
 
@@ -381,8 +381,7 @@ class OmnisciOnRayFrame(BasePandasFrame):
 
     def _set_columns(self, new_columns):
         exprs = {new: self.ref(old) for old, new in zip(self.columns, new_columns)}
-
-        self._op = TransformNode(self, exprs)
+        # self.op = TransformNode(self, exprs)
         self._columns_cache = new_columns
         if self._index_cols is not None:
             self._table_cols = self._index_cols + new_columns.tolist()
