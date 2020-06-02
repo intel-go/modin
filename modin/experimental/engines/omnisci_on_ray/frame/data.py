@@ -331,6 +331,9 @@ class OmnisciOnRayFrame(BasePandasFrame):
                 and not sort
                 and len(other_modin_frames) == 1
                 and len(other_modin_frames[0].columns) == 1
+                and isinstance(other_modin_frames[0]._op, MaskNode)
+                and other_modin_frames[0]._op.col_indices is None
+                and other_modin_frames[0]._op.row_numeric_idx is None
                 and other_modin_frames[0]._op.input[0] == self
             ), "Only appending one column from the same dataframe is supported"
 
@@ -348,10 +351,11 @@ class OmnisciOnRayFrame(BasePandasFrame):
 
             new_op = TransformNode(self, exprs)
 
-            new_columns = [*self.columns, "__appended_column__"]
             new_frame = self.__constructor__(
                 columns=Index.__new__(
-                    Index, data=new_columns, dtype=self.columns.dtype
+                    Index,
+                    data=self.columns.insert("__appended_column__"),
+                    dtype=self.columns.dtype,
                 ),
                 op=new_op,
                 index_cols=self._index_cols,
@@ -382,13 +386,11 @@ class OmnisciOnRayFrame(BasePandasFrame):
         raise NotImplementedError("OmnisciOnRayFrame._set_index is not yet suported")
 
     def _set_columns(self, new_columns):
-        exprs = {}
-        for old, new in zip(self.columns, new_columns):
-            exprs[new] = InputRefExpr(self._table_cols.index(old))
+        exprs = {new: self.ref(old) for old, new in zip(self.columns, new_columns)}
 
-        self.op = TransformNode(self, exprs)
+        self._op = TransformNode(self, exprs)
         self._columns_cache = new_columns
-        self._table_cols = new_columns.tolist()
+        self._table_cols = self._index_cols + new_columns.tolist()
 
     def _get_columns(self):
         return super(OmnisciOnRayFrame, self)._get_columns()

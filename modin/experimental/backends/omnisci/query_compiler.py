@@ -181,14 +181,8 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
             A new QueryCompiler.
         """
         assert index == None, "Only column drop is supported"
-        res_columns = []
-        if columns is not None:
-            for c in self.columns:
-                if not c in columns:
-                    res_columns.append(c)
-
         return self.__constructor__(
-            self._modin_frame.mask(row_indices=index, col_indices=res_columns)
+            self._modin_frame.mask(row_indices=index, col_indices=self.columns.drop(columns))
         )
 
 

@@ -41,6 +41,14 @@ class TestMasks:
 
         run_and_compare(projection, data=self.data, cols=cols)
 
+    def test_drop(self):
+        pandas_df = pd.DataFrame(self.data)
+        modin_df = pd.DataFrame(self.data)
+
+        pandas_df = pandas_df.drop(columns="a")
+        modin_df = modin_df.drop(columns="a")
+        df_equals(pandas_df, modin_df)
+
 
 class TestFillna:
     data = {"a": [1, 1, None], "b": [None, None, 2], "c": [3, None, None]}
@@ -85,6 +93,13 @@ class TestConcat:
             sort=sort,
             ignore_index=ignore_index,
         )
+
+    def test_concat_with_same_df(self):
+        pandas_df = pd.DataFrame(self.data)
+        modin_df = pd.DataFrame(self.data)
+        pandas_df["d"] = pandas_df["a"]
+        modin_df["d"] = modin_df["a"]
+        df_equals(pandas_df, modin_df)
 
 
 class TestGroupby:
@@ -133,31 +148,3 @@ class TestMerge:
             return df1.merge(df2, on=on, how=how)
 
         run_and_compare(merge, data=self.data, data2=self.data2, on=on, how=how)
-
-
-test_data = {
-    "a": [1, 11, 101],
-    "b": [2.3, 12.1, 102.3],
-    "c": ["str1", "oas", "steqwe"],
-}
-
-
-def test_concat_with_same_df():
-    data = [[1, 11, 101], [1, 21, 201], [2, 12, 102], [2, 22, 202], [2, 32, 302]]
-    cols = ["a", "b", "c"]
-    pandas_df = pd.DataFrame(data, columns=cols)
-    modin_df = pd.DataFrame(data, columns=cols)
-    pandas_df["d"] = pandas_df["a"]
-    modin_df["d"] = modin_df["a"]
-    df_equals(pandas_df, modin_df)
-
-
-def test_drop():
-    data = [[1, 11, 101], [1, 21, 201], [2, 12, 102], [2, 22, 202], [2, 32, 302]]
-    cols = ["a", "b", "c"]
-    pandas_df = pd.DataFrame(data, columns=cols)
-    modin_df = pd.DataFrame(data, columns=cols)
-
-    pandas_df = pandas_df.drop(columns="a")
-    modin_df = modin_df.drop(columns="a")
-    df_equals(pandas_df, modin_df)
