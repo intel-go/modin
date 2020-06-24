@@ -1031,7 +1031,7 @@ class TestBinaryOp:
     cmp_data = {
         "a": [1, 2, 3, 4, 5],
         "b": [10, 20, 30, 40, 50],
-        "c": [50.0, 40.0, 30.0, 20.0, 10.0],
+        "c": [50.0, 40.0, 30.1, 20.0, 10.0],
     }
     cmp_fn_values = ["eq", "ne", "le", "lt", "ge", "gt"]
 
@@ -1049,7 +1049,7 @@ class TestBinaryOp:
     @pytest.mark.parametrize("cmp_fn", cmp_fn_values)
     def test_cmp_list(self, cmp_fn):
         def cmp(df, cmp_fn, **kwargs):
-            return getattr(df, cmp_fn)([3, 30, 30.0])
+            return getattr(df, cmp_fn)([3, 30, 30.1])
 
         run_and_compare(cmp, data=self.cmp_data, cmp_fn=cmp_fn)
 

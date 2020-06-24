@@ -92,6 +92,8 @@ class OmnisciOnRayFrameManager(RayFrameManager):
         at = pyarrow.Table.from_batches([rb])
 
         res = np.empty((1, 1), dtype=np.dtype(object))
+        # workaround for https://github.com/modin-project/modin/issues/1851
+        at = at.rename_columns(["F_" + str(c) for c in columns])
         res[0][0] = cls._partition_class.put_arrow(at)
 
         return res

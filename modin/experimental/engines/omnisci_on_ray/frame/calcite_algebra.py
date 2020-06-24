@@ -66,7 +66,7 @@ class CalciteScanNode(CalciteBaseNode):
         assert modin_frame._partitions.size == 1
         assert modin_frame._partitions[0][0].frame_id is not None
         super(CalciteScanNode, self).__init__("EnumerableTableScan")
-        self.table = ["modin_db", modin_frame._partitions[0][0].frame_id]
+        self.table = ["omnisci", modin_frame._partitions[0][0].frame_id]
         self.fieldNames = [f"F_{col}" for col in modin_frame._table_cols] + ["rowid"]
         # OmniSci expects from scan node to have 'inputs' field
         # holding empty list
