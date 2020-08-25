@@ -36,8 +36,38 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
 
     def __init__(self, frame, shape_hint=None):
         assert frame is not None
+        self._build_defaults_methods()
         self._modin_frame = frame
         self._shape_hint = shape_hint
+
+    def __new__(cls, *args, **kwargs):
+        # `cls.__abstactmethods__` contains a set of abstract methods
+        # that was not overriden in `cls`, so saving that set, to replace
+        # these methods to `default_to_pandas`
+        cls._not_implemented = cls.__abstractmethods__
+        cls.__abstractmethods__ = frozenset()
+        obj = super().__new__(cls)
+        return obj
+
+    def _build_defaults_methods(self):
+        if hasattr(self, "_not_implemented"):
+            for name in self._not_implemented:
+                new_attr = self._default_to_pandas_builder(name)
+                setattr(self, name, new_attr)
+
+    def _default_to_pandas_builder(self, key):
+        def wrapper(*args, **kwargs):
+            return self.default_to_pandas(
+                getattr(pandas.DataFrame, key), *args, **kwargs
+            )
+
+        return wrapper
+
+    def __getattr__(self, key):
+        if key in dir(PandasQueryCompiler):
+            return self._default_to_pandas_builder(key)
+        else:
+            raise AttributeError(key)
 
     def to_pandas(self):
         return self._modin_frame.to_pandas()
@@ -513,92 +543,3 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
     @property
     def dtypes(self):
         return self._modin_frame.dtypes
-
-    __and__ = DFAlgNotSupported("__and__")
-    __or__ = DFAlgNotSupported("__or__")
-    __rand__ = DFAlgNotSupported("__rand__")
-    __ror__ = DFAlgNotSupported("__ror__")
-    __rxor__ = DFAlgNotSupported("__rxor__")
-    __xor__ = DFAlgNotSupported("__xor__")
-    abs = DFAlgNotSupported("abs")
-    add_prefix = DFAlgNotSupported("add_prefix")
-    add_suffix = DFAlgNotSupported("add_suffix")
-    all = DFAlgNotSupported("all")
-    any = DFAlgNotSupported("any")
-    apply = DFAlgNotSupported("apply")
-    applymap = DFAlgNotSupported("applymap")
-    back = DFAlgNotSupported("back")
-    clip = DFAlgNotSupported("clip")
-    combine = DFAlgNotSupported("combine")
-    combine_first = DFAlgNotSupported("combine_first")
-    conj = DFAlgNotSupported("conj")
-    count = DFAlgNotSupported("count")
-    cummax = DFAlgNotSupported("cummax")
-    cummin = DFAlgNotSupported("cummin")
-    cumprod = DFAlgNotSupported("cumprod")
-    cumsum = DFAlgNotSupported("cumsum")
-    describe = DFAlgNotSupported("describe")
-    df_update = DFAlgNotSupported("df_update")
-    diff = DFAlgNotSupported("diff")
-    dropna = DFAlgNotSupported("dropna")
-    eval = DFAlgNotSupported("eval")
-    first_valid_index = DFAlgNotSupported("first_valid_index")
-    front = DFAlgNotSupported("front")
-    get_dummies = DFAlgNotSupported("get_dummies")
-    getitem_row_array = DFAlgNotSupported("getitem_row_array")
-    groupby_agg = DFAlgNotSupported("groupby_agg")
-    groupby_all = DFAlgNotSupported("groupby_all")
-    groupby_any = DFAlgNotSupported("groupby_any")
-    groupby_max = DFAlgNotSupported("groupby_max")
-    groupby_min = DFAlgNotSupported("groupby_min")
-    groupby_prod = DFAlgNotSupported("groupby_prod")
-    groupby_reduce = DFAlgNotSupported("groupby_reduce")
-    head = DFAlgNotSupported("head")
-    idxmax = DFAlgNotSupported("idxmax")
-    idxmin = DFAlgNotSupported("idxmin")
-    isin = DFAlgNotSupported("isin")
-    isna = DFAlgNotSupported("isna")
-    is_monotonic = DFAlgNotSupported("is_monotonic")
-    is_monotonic_decreasing = DFAlgNotSupported("is_monotonic_decreasing")
-    last_valid_index = DFAlgNotSupported("last_valid_index")
-    max = DFAlgNotSupported("max")
-    mean = DFAlgNotSupported("mean")
-    median = DFAlgNotSupported("median")
-    melt = DFAlgNotSupported("melt")
-    memory_usage = DFAlgNotSupported("memory_usage")
-    min = DFAlgNotSupported("min")
-    mod = DFAlgNotSupported("mod")
-    mode = DFAlgNotSupported("mode")
-    negative = DFAlgNotSupported("negative")
-    notna = DFAlgNotSupported("notna")
-    nunique = DFAlgNotSupported("nunique")
-    pow = DFAlgNotSupported("pow")
-    prod = DFAlgNotSupported("prod")
-    quantile_for_list_of_values = DFAlgNotSupported("quantile_for_list_of_values")
-    quantile_for_single_value = DFAlgNotSupported("quantile_for_single_value")
-    query = DFAlgNotSupported("query")
-    rank = DFAlgNotSupported("rank")
-    reindex = DFAlgNotSupported("reindex")
-    repeat = DFAlgNotSupported("repeat")
-    rfloordiv = DFAlgNotSupported("rfloordiv")
-    rmod = DFAlgNotSupported("rmod")
-    round = DFAlgNotSupported("round")
-    rpow = DFAlgNotSupported("rpow")
-    rsub = DFAlgNotSupported("rsub")
-    rtruediv = DFAlgNotSupported("rtruediv")
-    skew = DFAlgNotSupported("skew")
-    series_update = DFAlgNotSupported("series_update")
-    series_view = DFAlgNotSupported("series_view")
-    sort_index = DFAlgNotSupported("sort_index")
-    std = DFAlgNotSupported("std")
-    sum = DFAlgNotSupported("sum")
-    tail = DFAlgNotSupported("tail")
-    to_datetime = DFAlgNotSupported("to_datetime")
-    to_numpy = DFAlgNotSupported("to_numpy")
-    to_numeric = DFAlgNotSupported("to_numeric")
-    transpose = DFAlgNotSupported("transpose")
-    unique = DFAlgNotSupported("unique")
-    update = DFAlgNotSupported("update")
-    var = DFAlgNotSupported("var")
-    where = DFAlgNotSupported("where")
-    write_items = DFAlgNotSupported("write_items")
