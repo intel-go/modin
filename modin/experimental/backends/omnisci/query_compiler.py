@@ -17,17 +17,10 @@ from modin.backends.pandas.query_compiler import PandasQueryCompiler
 import pandas
 
 from pandas.core.dtypes.common import is_list_like
+from .default_methods_builder import add_defaults, DFAlgNotSupported
 
 
-def DFAlgNotSupported(fn_name):
-    def fn(*args, **kwargs):
-        raise NotImplementedError(
-            "{} is not yet suported in DFAlgQueryCompiler".format(fn_name)
-        )
-
-    return fn
-
-
+@add_defaults
 class DFAlgQueryCompiler(BaseQueryCompiler):
     """This class implements the logic necessary for operating on partitions
         with a lazy DataFrame Algebra based backend."""
@@ -36,24 +29,18 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
 
     def __init__(self, frame, shape_hint=None):
         assert frame is not None
-        self._build_defaults_methods()
         self._modin_frame = frame
         self._shape_hint = shape_hint
 
-    def __new__(cls, *args, **kwargs):
-        # `cls.__abstactmethods__` contains a set of abstract methods
-        # that was not overriden in `cls`, so saving that set, to replace
-        # these methods to `default_to_pandas`
-        cls._not_implemented = cls.__abstractmethods__
-        cls.__abstractmethods__ = frozenset()
-        obj = super().__new__(cls)
-        return obj
+    def _default_to_pandas_df(self, __method_name__, *args, **kwargs):
+        return self.default_to_pandas(
+            getattr(pandas.DataFrame, __method_name__), *args, **kwargs
+        )
 
-    def _build_defaults_methods(self):
-        if hasattr(self, "_not_implemented"):
-            for name in self._not_implemented:
-                new_attr = self._default_to_pandas_builder(name)
-                setattr(self, name, new_attr)
+    def _default_to_pandas_ser(self, __method_name__, *args, **kwargs):
+        return self.default_to_pandas(
+            getattr(pandas.Series, __method_name__), *args, **kwargs
+        )
 
     def _default_to_pandas_builder(self, key):
         def wrapper(*args, **kwargs):
@@ -92,6 +79,12 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
         else:
             new_modin_frame = self._modin_frame.mask(col_indices=key)
         return self.__constructor__(new_modin_frame, shape_hint)
+
+    def getitem_row_array(self, key, numeric=False):
+        def row_picker(df):
+            return df.squeeze(axis=1).iloc[key]
+
+        return self.default_to_pandas(row_picker)
 
     # Merge
 
@@ -309,7 +302,10 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
         Returns:
             A new QueryCompiler.
         """
-        assert index is None, "Only column drop is supported"
+        if index is not None:
+            return self.default_to_pandas(
+                pandas.DataFrame.drop, index=index, columns=columns
+            )
         return self.__constructor__(
             self._modin_frame.mask(
                 row_indices=index, col_indices=self.columns.drop(columns)
