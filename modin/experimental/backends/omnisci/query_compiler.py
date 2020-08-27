@@ -50,12 +50,6 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
 
         return wrapper
 
-    def __getattr__(self, key):
-        if key in dir(PandasQueryCompiler):
-            return self._default_to_pandas_builder(key)
-        else:
-            raise AttributeError(key)
-
     def to_pandas(self):
         return self._modin_frame.to_pandas()
 
