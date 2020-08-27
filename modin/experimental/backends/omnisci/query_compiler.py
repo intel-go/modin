@@ -218,7 +218,15 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
         return self._modin_frame.index
 
     def _set_index(self, index):
-        self._modin_frame.index = index
+        # ModinFrame._set_index is not supported yet
+        # self._modin_frame.index = index
+        def set_index(df):
+            df.index = index
+            return df
+
+        new_qc = self.default_to_pandas(set_index)
+        self._modin_frame = new_qc._modin_frame
+        self._shape_hint = new_qc._shape_hint
 
     def _get_columns(self):
         return self._modin_frame.columns

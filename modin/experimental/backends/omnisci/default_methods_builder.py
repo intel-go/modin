@@ -11,7 +11,7 @@
 # ANY KIND, either express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
 
-from modin.backends.pandas.query_compiler import PandasQueryCompiler
+from modin.backends.pandas.query_compiler import PandasQueryCompiler, _dt_prop_map
 
 import pandas
 import numpy as np
@@ -46,6 +46,18 @@ def _series_wrapper_builder(fn):
     return series_wrapper
 
 
+def _build_wrapper(fn, fn_name=None):
+    def wrapper(self, *args, **kwargs):
+        return self.default_to_pandas(fn, *args, **kwargs)
+
+    if fn_name is None:
+        fn_name = fn.__name__
+
+    # setting proper function name that will be printed in default to pandas warning
+    wrapper.__name__ = fn_name
+    return wrapper
+
+
 def _build_default_method(obj, fn_name):
     fn = getattr(obj, fn_name)
     assert callable(fn) or type(fn) == property
@@ -56,12 +68,13 @@ def _build_default_method(obj, fn_name):
     if obj == pandas.Series:
         fn = _series_wrapper_builder(fn)
 
-    def wrapper(self, *args, **kwargs):
-        return self.default_to_pandas(fn, *args, **kwargs)
+    return _build_wrapper(fn, fn_name)
 
-    # setting proper function name that will be printed in default to pandas warning
-    wrapper.__name__ = f"pandas.{obj.__name__}.{fn_name}"
-    return wrapper
+
+def _build_dt_method(fn_name):
+    fn_name = re.findall(r"dt_(.*)", fn_name)[0]
+    fn = _dt_prop_map(fn_name)
+    return _build_wrapper(fn, fn_name)
 
 
 def _build_default_groupby(name):
@@ -111,10 +124,12 @@ _group_pickers = {
     "series": lambda name: hasattr(pandas.Series, name)
     and not hasattr(pandas.DataFrame, name),
     "groupby": lambda name: re.match(r"groupby_.*", name) is not None,
+    "dt_methods": lambda name: re.match(r"dt_.*", name) is not None,
 }
 
 _default_builders = {
     "dataframe": lambda name: _build_default_method(pandas.DataFrame, name),
     "series": lambda name: _build_default_method(pandas.Series, name),
     "groupby": _build_default_groupby,
+    "dt_methods": _build_dt_method,
 }

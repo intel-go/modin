@@ -42,6 +42,7 @@ from .expr import (
 from collections import OrderedDict
 
 import numpy as np
+import re
 import pyarrow
 
 
@@ -349,6 +350,7 @@ class OmnisciOnRayFrame(BasePandasFrame):
         )
 
     def astype(self, col_dtypes, **kwargs):
+        # breakpoint()
         columns = col_dtypes.keys()
         new_dtypes = self.dtypes.copy()
         for column in columns:
@@ -1023,7 +1025,7 @@ class OmnisciOnRayFrame(BasePandasFrame):
         return [self._index_name(n) for n in cols]
 
     def _index_name(self, col):
-        if col.startswith("__index__"):
+        if col.startswith("__index__") or re.match(r"__index\d*__", col) is not None:
             return None
         return col
 
@@ -1033,7 +1035,7 @@ class OmnisciOnRayFrame(BasePandasFrame):
         new_columns = df.columns
         # If there is non-trivial index, we put it into columns.
         # That's what we usually have for arrow tables and execution
-        # result. Unnamed index is renamed to __index__. Also all
+        # result. Unnamed index is renamed to __index{i}__. Also all
         # columns get 'F_' prefix to handle names unsupported in
         # OmniSci.
         if cls._is_trivial_index(df.index):
@@ -1042,7 +1044,10 @@ class OmnisciOnRayFrame(BasePandasFrame):
             orig_index_names = df.index.names
             orig_df = df
 
-            index_cols = ["__index__" if n is None else n for n in df.index.names]
+            index_cols = [
+                f"__index{i}__" if n is None else n
+                for i, n in enumerate(df.index.names)
+            ]
             df.index.names = index_cols
             df = df.reset_index()
 
