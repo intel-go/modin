@@ -32,24 +32,6 @@ class DFAlgQueryCompiler(BaseQueryCompiler):
         self._modin_frame = frame
         self._shape_hint = shape_hint
 
-    def _default_to_pandas_df(self, __method_name__, *args, **kwargs):
-        return self.default_to_pandas(
-            getattr(pandas.DataFrame, __method_name__), *args, **kwargs
-        )
-
-    def _default_to_pandas_ser(self, __method_name__, *args, **kwargs):
-        return self.default_to_pandas(
-            getattr(pandas.Series, __method_name__), *args, **kwargs
-        )
-
-    def _default_to_pandas_builder(self, key):
-        def wrapper(*args, **kwargs):
-            return self.default_to_pandas(
-                getattr(pandas.DataFrame, key), *args, **kwargs
-            )
-
-        return wrapper
-
     def to_pandas(self):
         return self._modin_frame.to_pandas()
 
