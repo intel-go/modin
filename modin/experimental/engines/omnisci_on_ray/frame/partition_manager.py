@@ -59,7 +59,7 @@ class OmnisciOnRayFrameManager(RayFrameManager):
             return np.array(parts), row_lengths, col_widths
 
     @classmethod
-    def run_exec_plan(cls, plan, index_cols, dtypes):
+    def run_exec_plan(cls, plan, index_cols, dtypes, columns):
         # TODO: this plan is supposed to be executed remotely using Ray.
         # For now OmniSci engine support only a single node cluster.
         # Therefore remote execution is not necessary and will be added
@@ -85,7 +85,7 @@ class OmnisciOnRayFrameManager(RayFrameManager):
         calcite_plan = CalciteBuilder().build(plan)
         calcite_json = CalciteSerializer().serialize(calcite_plan)
 
-        curs = omniSession.executeRA("execute relalg " + calcite_json)
+        curs = omniSession.executeRA("execute calcite " + calcite_json)
         assert curs
         rb = curs.getArrowRecordBatch()
         assert rb
