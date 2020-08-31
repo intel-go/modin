@@ -85,7 +85,11 @@ class OmnisciOnRayFrameManager(RayFrameManager):
         calcite_plan = CalciteBuilder().build(plan)
         calcite_json = CalciteSerializer().serialize(calcite_plan)
 
-        curs = omniSession.executeRA("execute calcite " + calcite_json)
+        cmd_prefix = "execute relalg "
+        if environ.get('MODIN_USE_CALCITE') is not None:
+            cmd_prefix = "execute calcite "
+
+        curs = omniSession.executeRA(cmd_prefix + calcite_json)
         assert curs
         rb = curs.getArrowRecordBatch()
         assert rb
