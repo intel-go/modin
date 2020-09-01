@@ -141,7 +141,7 @@ class CalciteSerializer:
             return {
                 "literal": int(literal.val),
                 "type": "DECIMAL",
-                "target_type": "BIGINT",
+                "target_type": target_type,
                 "scale": 0,
                 "precision": len(str(literal.val)),
                 "type_scale": 0,

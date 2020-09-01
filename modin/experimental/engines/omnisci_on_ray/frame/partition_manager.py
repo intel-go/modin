@@ -25,6 +25,7 @@ from .calcite_serializer import CalciteSerializer
 
 import pyarrow
 import pandas
+import os
 
 
 class OmnisciOnRayFrameManager(RayFrameManager):
@@ -86,7 +87,11 @@ class OmnisciOnRayFrameManager(RayFrameManager):
         calcite_json = CalciteSerializer().serialize(calcite_plan)
 
         cmd_prefix = "execute relalg "
-        if environ.get('MODIN_USE_CALCITE') is not None:
+
+        use_calcite_env = os.environ.get("MODIN_USE_CALCITE")
+        use_calcite = use_calcite_env is not None and use_calcite_env.lower() == "true"
+
+        if use_calcite:
             cmd_prefix = "execute calcite "
 
         curs = omniSession.executeRA(cmd_prefix + calcite_json)
@@ -97,7 +102,8 @@ class OmnisciOnRayFrameManager(RayFrameManager):
 
         res = np.empty((1, 1), dtype=np.dtype(object))
         # workaround for https://github.com/modin-project/modin/issues/1851
-        at = at.rename_columns(["F_" + str(c) for c in columns])
+        if use_calcite:
+            at = at.rename_columns(["F_" + str(c) for c in columns])
         res[0][0] = cls._partition_class.put_arrow(at)
 
         return res

@@ -473,7 +473,7 @@ def df_equals(df1, df2):
                 and df1.columns.equals(df2.columns)
             ):
                 return
-        assert False, "df1.type != df2.type"
+        assert False
 
     if isinstance(df1, (list, tuple)) and all(
         isinstance(d, (pd.DataFrame, pd.Series, pandas.DataFrame, pandas.Series))
