@@ -90,7 +90,13 @@ import multiprocessing
 from .. import execution_engine, partition_format, Publisher
 
 # Set this so that Pandas doesn't try to multithread by itself
-os.environ["OMP_NUM_THREADS"] = "1"
+if "OMP_NUM_THREADS" not in os.environ:
+    import warnings
+    warnings.warn("[Modin] Forcing OMP_NUM_THREADS=1 to avoid performance "
+                   "degradation with many workers (oversubscription)."
+                   "Override this by explicitly setting OMP_NUM_THREADS.")
+    os.environ["OMP_NUM_THREADS"] = "1"
+
 DEFAULT_NPARTITIONS = 4
 num_cpus = 1
 

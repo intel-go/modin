@@ -18,6 +18,7 @@ from modin.error_message import ErrorMessage
 
 from pyarrow.csv import read_csv, ParseOptions, ConvertOptions, ReadOptions
 import pyarrow as pa
+import os
 
 
 class OmnisciOnRayIO(RayIO):
@@ -167,7 +168,7 @@ class OmnisciOnRayIO(RayIO):
                 auto_dict_max_cardinality=None,
             )
             ro = ReadOptions(
-                use_threads=True,
+                use_threads=os.getenv("OMP_NUM_THREADS") != "1",
                 block_size=None,
                 skip_rows=skiprows,
                 column_names=names,
