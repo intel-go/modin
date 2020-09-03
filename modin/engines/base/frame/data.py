@@ -15,12 +15,13 @@ from collections import OrderedDict
 import numpy as np
 import pandas
 from pandas.core.indexes.api import ensure_index, Index, RangeIndex
-from pandas.core.dtypes.common import is_numeric_dtype
+from pandas.core.dtypes.common import is_numeric_dtype, CategoricalDtype
 from typing import Union
 
 from modin.backends.pandas.query_compiler import PandasQueryCompiler
 from modin.error_message import ErrorMessage
 from modin.backends.pandas.parsers import find_common_type_cat as find_common_type
+from pyarrow import dictionary, int32, string
 
 
 class BasePandasFrame(object):
@@ -1784,6 +1785,8 @@ class BasePandasFrame(object):
 
     @classmethod
     def _arrow_type_to_dtype(cls, arrow_type):
+        if arrow_type.equals(dictionary(int32(), string())):
+            return CategoricalDtype() 
         res = arrow_type.to_pandas_dtype()
         if not isinstance(res, (np.dtype, str)):
             return np.dtype(res)

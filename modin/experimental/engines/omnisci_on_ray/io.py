@@ -138,7 +138,14 @@ class OmnisciOnRayIO(RayIO):
                 return cls._read(**mykwargs)
 
             if isinstance(dtype, dict):
-                column_types = {c: cls._dtype_to_arrow(t) for c, t in dtype.items()}
+                column_types = {}
+                for c, t in dtype.items():
+                    tname = t if isinstance(t, str) else t.name
+                    print(tname)
+                    if tname == "category" or tname == "string":
+                        print("ignore", c)
+                        continue
+                    column_types[c] = cls._dtype_to_arrow(t)
             else:
                 column_types = cls._dtype_to_arrow(dtype)
 
@@ -163,8 +170,8 @@ class OmnisciOnRayIO(RayIO):
                 strings_can_be_null=None,
                 include_columns=None,
                 include_missing_columns=None,
-                auto_dict_encode=None,
-                auto_dict_max_cardinality=None,
+                auto_dict_encode=True,
+                auto_dict_max_cardinality=200,
             )
             ro = ReadOptions(
                 use_threads=True,
@@ -180,7 +187,7 @@ class OmnisciOnRayIO(RayIO):
                 parse_options=po,
                 convert_options=co,
             )
-
+            print(at)
             return cls.from_arrow(at)
         except pa.ArrowNotImplementedError:
             if eng in ["arrow"]:
