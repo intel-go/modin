@@ -16,10 +16,9 @@ import pandas as pd
 import numpy as np
 import pytest
 
-os.environ["MODIN_EXPERIMENTAL"] = "True"
-os.environ["MODIN_ENGINE"] = "ray"
-os.environ["MODIN_BACKEND"] = "omnisci"
-
+import modin
+modin.set_backends('ray', 'omnisci')
+import modin.experimental.pandas
 import modin.pandas as mpd
 from modin.pandas.test.utils import (
     df_equals,
