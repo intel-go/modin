@@ -36,7 +36,7 @@ def simulate_cloud(request):
 
     from modin.experimental.cloud import create_cluster, get_connection
 
-    with create_cluster("local", __spawner__="local"):
+    with create_cluster("local", cluster_type="local"):
 
         def set_env(mode):
             import os
