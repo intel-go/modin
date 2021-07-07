@@ -35,10 +35,11 @@ from .utils import (
 
 from modin import execution_engine
 
-if os.environ.get("MODIN_BACKEND", "Pandas").lower() == "pandas":
-    import modin.pandas as pd
-else:
-    import modin.experimental.pandas as pd
+# if os.environ.get("MODIN_BACKEND", "Pandas").lower() == "pandas":
+#     import modin.pandas as pd
+# else:
+#     import modin.experimental.pandas as pd
+import modin.pandas as pd
 
 pd.DEFAULT_NPARTITIONS = 4
 
